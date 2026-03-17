@@ -1,56 +1,47 @@
-name: Automatically Crawl Steam Discount
-on:
-  pull_request:
-    branches:
-      - master
-  workflow_dispatch:
-    branches:
-      - master
-  schedule:
-    - cron: '0 12 * * *'
+name: Steam Discount Auto Run
 
+on:
+  schedule:
+    # 每半小时运行一次（可自行调整，比如 0 * * * * 每小时）
+    - cron: '*/30 * * * *'
+  workflow_dispatch:  # 手动触发开关
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    # 当仓库隶属组织时，赋予流水线“写权限”以便提交变更
-    permissions:
-      contents: write
-    
     steps:
-      - name: Check out repo
-        uses: actions/checkout@v2
+      # 步骤1：拉取代码到运行环境
+      - name: Checkout code
+        uses: actions/checkout@v4
 
+      # 步骤2：配置 Python 环境
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.8
-      - uses: actions/cache@v3
-        name: Configure pip caching
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          python-version: '3.9'  # 兼容项目的 Python 版本
 
-      - name: Install Python dependencies
+      # 步骤3：安装依赖
+      - name: Install dependencies
         run: |
-          python -m pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Crawl Steam Discount
-        run: |-
-          python main.py -g "${{ secrets.CRAWL_PWD }}" -p ${{ secrets.PAGES }} -z ${{ secrets.ZONE }} -f ${{ secrets.FILTER }} -l ${{ secrets.LIMIT }} -s
+      # 步骤4：运行主程序（生成 docs 目录的静态页面）
+      - name: Run main.py
+        env:
+          # 读取你配置的 Secrets 环境变量
+          PAGES: ${{ secrets.PAGES }}
+          ZONE: ${{ secrets.ZONE }}
+          LIMIT: ${{ secrets.LIMIT }}
+          FILTER: ${{ secrets.FILTER }}
+        run: |
+          python main.py
 
-
-      # 如果不希望污染 commit 记录，user.email 和 user.name 随便填即可
-      # Github Runner 是有权限提交到仓库的，只要 user 不是 owner ，当次 commit 不会被记录
-      - name: Commit and push Github page (if changed)
-        if: ${{ github.event_name != 'pull_request' }}
-        run: |-
-          git diff
-          git config --global user.email "github-bot@example.com"
-          git config --global user.name "Github-Bot"
-          git add -A
-          git commit -m "Updated by Github Bot" || exit 0
-          git push origin master
-
+      # 步骤5：将 docs 目录推送到 gh-pages 分支（核心缺失步骤）
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}  # GitHub 自动生成的令牌，无需手动配置
+          publish_dir: ./docs  # 指定要发布的目录（项目生成的静态页面在 docs 里）
+          publish_branch: gh-pages  # 推送到 gh-pages 分支
+          force_orphan: true  # 强制覆盖 gh-pages 分支（避免历史冲突）
