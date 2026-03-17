@@ -2,8 +2,7 @@ name: Steam Discount Auto Run
 
 on:
   schedule:
-    # 每半小时运行一次（可自行调整，比如 0 * * * * 每小时）
-    - cron: '*/30 * * * *'
+    - cron: '0 0 * * *'
   workflow_dispatch:  # 手动触发开关
 
 jobs:
